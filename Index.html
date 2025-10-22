@@ -1,0 +1,590 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Full Thrust Fleet Movement Tracker</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #111827;
+            color: #d1d5db;
+        }
+        .ship-card {
+            background-color: #1f2937;
+            border-color: #374151;
+        }
+        .btn-primary {
+            background-color: #4f46e5;
+            color: white;
+        }
+        .btn-primary:hover {
+            background-color: #4338ca;
+        }
+        .btn-secondary {
+            background-color: #4b5563;
+            color: white;
+        }
+        .btn-secondary:hover {
+            background-color: #374151;
+        }
+        .btn-danger {
+            background-color: #dc2626;
+            color: white;
+        }
+        .btn-danger:hover {
+            background-color: #b91c1c;
+        }
+        input, select {
+            background-color: #374151;
+            border-color: #4b5563;
+            color: #d1d5db;
+        }
+        input:focus, select:focus {
+            outline: none;
+            border-color: #4f46e5;
+            box-shadow: 0 0 0 2px #4f46e5;
+        }
+        .btn-order {
+            background-color: #374151;
+            transition: background-color 150ms;
+        }
+        .btn-order:hover {
+            background-color: #4b5563;
+        }
+        .btn-order:disabled {
+            background-color: #1f2937;
+            color: #4b5563;
+            cursor: not-allowed;
+        }
+        ::-webkit-scrollbar {
+            width: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #1f2937;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #4b5563;
+            border-radius: 4px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #6b7280;
+        }
+    </style>
+</head>
+<body class="p-4 md:p-8">
+    <div class="max-w-7xl mx-auto">
+        <header class="text-center mb-8">
+            <h1 class="text-3xl md:text-4xl font-bold text-white">Full Thrust Fleet Movement Tracker</h1>
+            <p class="text-lg text-gray-400 mt-2">Based on Cinematic Movement Rules</p>
+        </header>
+
+        <!-- Ship Creation Form -->
+        <div class="ship-card p-6 rounded-lg border mb-8">
+            <h2 class="text-2xl font-semibold text-white mb-4">Add Ship to Fleet</h2>
+            <form id="add-ship-form" class="grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
+                <div>
+                    <label for="ship-name" class="block text-sm font-medium mb-1">Ship Name</label>
+                    <input type="text" id="ship-name" class="w-full rounded-md p-2" placeholder="e.g., Valiant" required>
+                </div>
+                <div>
+                    <label for="thrust-rating" class="block text-sm font-medium mb-1">Thrust & Drive</label>
+                    <div class="flex items-center gap-2">
+                        <input type="number" id="thrust-rating" class="w-20 rounded-md p-2" min="1" value="4" required>
+                        <div class="flex items-center h-10">
+                            <input id="advanced-drive" type="checkbox" class="h-4 w-4 rounded border-gray-400 text-indigo-600 focus:ring-indigo-500">
+                            <label for="advanced-drive" class="ml-2 block text-sm font-medium text-gray-300">Advanced</label>
+                        </div>
+                    </div>
+                </div>
+                <div class="grid grid-cols-2 gap-2">
+                    <div>
+                        <label for="initial-velocity" class="block text-sm font-medium mb-1">Velocity</label>
+                        <input type="number" id="initial-velocity" class="w-full rounded-md p-2" min="0" value="0" required>
+                    </div>
+                    <div>
+                         <label for="initial-course" class="block text-sm font-medium mb-1">Course</label>
+                         <input type="number" id="initial-course" class="w-full rounded-md p-2" min="1" max="12" value="12" required>
+                    </div>
+                </div>
+                <button type="submit" class="btn-primary font-semibold rounded-md p-2 h-10 w-full transition duration-150 ease-in-out">Add Ship</button>
+            </form>
+        </div>
+        
+        <!-- Controls and Fleet Display -->
+        <div>
+            <div class="flex flex-col md:flex-row justify-between items-center mb-4">
+                <h2 class="text-2xl font-semibold text-white">Current Fleet</h2>
+                <div class="flex gap-2 mt-4 md:mt-0">
+                    <button id="process-orders-btn" class="btn-primary font-semibold rounded-md py-2 px-4 transition duration-150 ease-in-out">Process Turn Orders</button>
+                    <button id="reset-fleet-btn" class="btn-danger font-semibold rounded-md py-2 px-4 transition duration-150 ease-in-out">Reset Fleet</button>
+                </div>
+            </div>
+
+            <!-- Fleet List -->
+            <div id="fleet-list" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                <!-- Ship cards will be dynamically inserted here -->
+            </div>
+             <p id="fleet-placeholder" class="text-center text-gray-400 py-10">Your fleet is empty. Add a ship to get started.</p>
+        </div>
+
+        <!-- Turn Log -->
+        <div class="mt-8">
+            <h2 class="text-2xl font-semibold text-white mb-4">Turn Log</h2>
+            <div id="turn-log" class="ship-card p-4 rounded-lg border h-64 overflow-y-auto font-mono text-sm">
+                <p class="text-gray-500">Awaiting first turn...</p>
+            </div>
+        </div>
+    </div>
+
+<script>
+    // --- STATE MANAGEMENT ---
+    let fleet = [];
+    let turnCount = 1;
+
+    // --- DOM ELEMENTS ---
+    const addShipForm = document.getElementById('add-ship-form');
+    const fleetList = document.getElementById('fleet-list');
+    const turnLog = document.getElementById('turn-log');
+    const processOrdersBtn = document.getElementById('process-orders-btn');
+    const resetFleetBtn = document.getElementById('reset-fleet-btn');
+    const fleetPlaceholder = document.getElementById('fleet-placeholder');
+
+    // --- EVENT LISTENERS ---
+    addShipForm.addEventListener('submit', (e) => {
+        e.preventDefault();
+        const name = document.getElementById('ship-name').value;
+        const thrust = parseInt(document.getElementById('thrust-rating').value);
+        const velocity = parseInt(document.getElementById('initial-velocity').value);
+        const course = parseInt(document.getElementById('initial-course').value);
+
+        addShip(name, thrust, velocity, course);
+        addShipForm.reset();
+        document.getElementById('ship-name').focus();
+    });
+
+    processOrdersBtn.addEventListener('click', processTurnOrders);
+    resetFleetBtn.addEventListener('click', resetFleet);
+
+    // --- CORE LOGIC ---
+
+    /**
+     * Adds a new ship to the fleet state and re-renders the UI.
+     */
+    function addShip(name, thrust, velocity, course) {
+        const hasAdvancedDrive = document.getElementById('advanced-drive').checked;
+        const newShip = {
+            id: Date.now(),
+            name,
+            baseThrust: thrust,
+            currentThrust: thrust,
+            velocity,
+            course,
+            hasAdvancedDrive,
+            isRolled: false,
+            driveStatus: 'ok', // ok, damaged, destroyed
+            priorETUses: 0,
+            order: { turn1: 0, turn2: 0, velocityChange: 0, useET: false, isRolling: false },
+        };
+        fleet.push(newShip);
+        renderFleet();
+    }
+    
+    /**
+     * Removes a ship from the fleet by its ID.
+     */
+    function removeShip(shipId) {
+        fleet = fleet.filter(ship => ship.id !== shipId);
+        renderFleet();
+    }
+
+    /**
+     * Resets the entire fleet and log.
+     */
+    function resetFleet() {
+        fleet = [];
+        turnCount = 1;
+        turnLog.innerHTML = '<p class="text-gray-500">Fleet reset. Awaiting first turn...</p>';
+        renderFleet();
+    }
+    
+    /**
+     * Updates a ship's pending order based on button clicks.
+     */
+    function updateOrder(shipId, type, value, turnNumber = 1) {
+        const ship = fleet.find(s => s.id === shipId);
+        if (!ship || ship.currentThrust === 0) return;
+
+        let { turn1, turn2, velocityChange, useET, isRolling } = ship.order;
+
+        if (type === 'turn') {
+            if (turnNumber === 1) turn1 += value;
+            else turn2 += value;
+        } else if (type === 'velocity') {
+            velocityChange += value;
+        } else if (type === 'et') {
+            useET = value;
+            turn1 = 0;
+            turn2 = 0;
+            velocityChange = 0;
+        } else if (type === 'roll') {
+            isRolling = value;
+        }
+        
+        // --- Rule Validation ---
+        const shipThrust = ship.currentThrust;
+        const maxNormalTurn = ship.hasAdvancedDrive ? shipThrust : Math.floor(shipThrust / 2);
+        
+        const rollCost = isRolling ? 1 : 0;
+        const turnThrustUsed = Math.abs(turn1) + Math.abs(turn2) + rollCost;
+
+        const maxThrust = useET ? Math.floor(ship.baseThrust * 1.5) : shipThrust;
+        const maxTurn = useET ? maxThrust : maxNormalTurn;
+
+        if (turnThrustUsed > maxTurn) return; 
+
+        const totalThrustUsed = turnThrustUsed + Math.abs(velocityChange);
+        if (totalThrustUsed > maxThrust) return;
+        
+        ship.order = { turn1, turn2, velocityChange, useET, isRolling };
+        renderFleet();
+    }
+
+    /**
+     * Resets a single ship's order to default.
+     */
+    function clearOrder(shipId) {
+        const ship = fleet.find(s => s.id === shipId);
+        if (ship) {
+            ship.order = { turn1: 0, turn2: 0, velocityChange: 0, useET: ship.order.useET, isRolling: false };
+            renderFleet();
+        }
+    }
+
+    /**
+     * Processes all ship orders for the current turn.
+     */
+    function processTurnOrders() {
+        if (fleet.length === 0) {
+            logMessage('Cannot process turn: Fleet is empty.', 'error');
+            return;
+        }
+
+        logMessage(`--- Turn ${turnCount} ---`, 'system');
+        
+        fleet.forEach(ship => {
+            const { turn1, turn2, velocityChange, useET, isRolling } = ship.order;
+
+            if (useET) {
+                processEmergencyThrust(ship);
+            } else {
+                 if (turn1 === 0 && turn2 === 0 && velocityChange === 0 && !isRolling) {
+                    logMessage(`${ship.name}: No maneuvers. Continues at velocity ${ship.velocity} on course ${ship.course}.`, 'info');
+                } else {
+                   processSingleOrder(ship);
+                }
+            }
+        });
+
+        turnCount++;
+        renderFleet();
+    }
+
+    /**
+     * Handles the dice rolls and consequences of using Emergency Thrust.
+     */
+    function processEmergencyThrust(ship) {
+        let diceToRoll = 0;
+        const turnThrustUsed = Math.abs(ship.order.turn1) + Math.abs(ship.order.turn2) + (ship.order.isRolling ? 1 : 0);
+        const thrustUsed = turnThrustUsed + Math.abs(ship.order.velocityChange);
+        const normalTurnLimit = ship.hasAdvancedDrive ? ship.baseThrust : Math.floor(ship.baseThrust / 2);
+
+        if (thrustUsed > ship.baseThrust) diceToRoll++;
+        if (turnThrustUsed > normalTurnLimit) diceToRoll++;
+        
+        if (diceToRoll > 0) {
+            diceToRoll += ship.priorETUses;
+            ship.priorETUses++;
+        } else {
+             logMessage(`${ship.name}: Emergency Thrust enabled but not used. Proceeding with normal maneuver.`, 'info');
+             processSingleOrder(ship);
+             ship.order.useET = false;
+             return;
+        }
+
+        const rolls = Array.from({ length: diceToRoll }, () => Math.floor(Math.random() * 6) + 1);
+        const score = rolls.reduce((acc, roll) => {
+            if (roll >= 4 && roll <= 5) return acc + 1;
+            if (roll === 6) return acc + 2;
+            return acc;
+        }, 0);
+
+        let outcomeMessage = `${ship.name}: Emergency Thrust! Rolling ${diceToRoll}d6: [${rolls.join(', ')}]. Score: ${score}.`;
+
+        if (score === 0) {
+            outcomeMessage += " ET successful, no damage.";
+            logMessage(outcomeMessage, 'success');
+            processSingleOrder(ship);
+        } else if (score === 1) {
+            outcomeMessage += " ET successful, but drive is damaged!";
+            logMessage(outcomeMessage, 'warning');
+            damageDrive(ship);
+            processSingleOrder(ship);
+        } else if (score >= 2 && score <= 3) {
+            outcomeMessage += " ET FAILED! Drive is damaged and maneuver is aborted.";
+            logMessage(outcomeMessage, 'error');
+            damageDrive(ship);
+            ship.order = { turn1: 0, turn2: 0, velocityChange: 0, useET: false, isRolling: false };
+            logMessage(`${ship.name}: Continues at velocity ${ship.velocity} on course ${ship.course}.`, 'info');
+        } else {
+            outcomeMessage += " ET FAILED CATASTROPHICALLY! Drive is destroyed and maneuver is aborted.";
+            logMessage(outcomeMessage, 'error');
+            damageDrive(ship, true);
+            ship.order = { turn1: 0, turn2: 0, velocityChange: 0, useET: false, isRolling: false };
+            logMessage(`${ship.name}: Adrift. Continues at velocity ${ship.velocity} on course ${ship.course}.`, 'info');
+        }
+        ship.order.useET = false;
+    }
+    
+    /**
+     * Applies damage to a ship's drive system.
+     */
+    function damageDrive(ship, destroy = false) {
+        if (destroy || ship.driveStatus === 'damaged' || ship.baseThrust <= 1) {
+            ship.driveStatus = 'destroyed';
+            ship.currentThrust = 0;
+        } else {
+            ship.driveStatus = 'damaged';
+            ship.currentThrust = Math.floor(ship.baseThrust / 2);
+        }
+    }
+    
+    /**
+     * Repairs a ship's drive system, one stage at a time.
+     */
+    function repairDrive(shipId) {
+        const ship = fleet.find(s => s.id === shipId);
+        if (!ship) return;
+
+        if (ship.driveStatus === 'damaged') {
+            ship.driveStatus = 'ok';
+            ship.currentThrust = ship.baseThrust;
+            logMessage(`${ship.name}'s drive has been fully repaired.`, 'system');
+        } else if (ship.driveStatus === 'destroyed') {
+            ship.driveStatus = 'damaged';
+            ship.currentThrust = Math.floor(ship.baseThrust / 2);
+            logMessage(`${ship.name}'s drive has been partially repaired.`, 'system');
+        }
+        renderFleet();
+    }
+
+    /**
+     * Executes a single ship's processed order.
+     */
+    function processSingleOrder(ship) {
+        const { turn1, turn2, velocityChange, isRolling } = ship.order;
+        
+        let orderString = '';
+        if (turn1 !== 0) orderString += `${turn1 < 0 ? 'P' : 'S'}${Math.abs(turn1)} `;
+        if (turn2 !== 0) orderString += `${turn2 < 0 ? 'P' : 'S'}${Math.abs(turn2)} `;
+        if (velocityChange > 0) orderString += `+${velocityChange}`;
+        else if (velocityChange < 0) orderString += `${velocityChange}`;
+        if (isRolling) orderString += ' Roll';
+        orderString = orderString.trim();
+
+        const newVelocity = Math.max(0, ship.velocity + velocityChange);
+        let currentCourse = ship.course;
+        let courseChangeLog = '';
+
+        if (isRolling) {
+            ship.isRolled = !ship.isRolled;
+            courseChangeLog += `Ship ${ship.isRolled ? 'rolls to inverted' : 'rolls upright'}. `;
+        }
+
+        const dist1 = Math.floor(newVelocity / 2);
+        const dist2 = Math.ceil(newVelocity / 2);
+
+        if (turn1 !== 0 && turn2 !== 0) { // Double Course Change
+             const dir1 = turn1 < 0 ? 'P' : 'S';
+             currentCourse = calculateNewCourse(currentCourse, Math.abs(turn1), dir1);
+             courseChangeLog += `Makes First Turn of ${Math.abs(turn1)}pt to ${dir1 === 'P' ? 'Port' : 'Starboard'}. Moves ${dist1} MU. `;
+             
+             const dir2 = turn2 < 0 ? 'P' : 'S';
+             currentCourse = calculateNewCourse(currentCourse, Math.abs(turn2), dir2);
+             courseChangeLog += `Makes Second Turn of ${Math.abs(turn2)}pt to ${dir2 === 'P' ? 'Port' : 'Starboard'}. Moves ${dist2} MU.`;
+
+        } else if (turn1 !== 0 || turn2 !== 0) { // Single Course Change (split)
+            const totalTurnVal = turn1 !== 0 ? turn1 : turn2;
+            const totalTurn = Math.abs(totalTurnVal);
+            const direction = totalTurnVal < 0 ? 'P' : 'S';
+            const splitTurn1 = Math.floor(totalTurn / 2);
+            const splitTurn2 = Math.ceil(totalTurn / 2);
+
+            if (splitTurn1 > 0) {
+                 currentCourse = calculateNewCourse(currentCourse, splitTurn1, direction);
+                 courseChangeLog += `Turns ${splitTurn1}pt to ${direction === 'P' ? 'Port' : 'Starboard'}. `;
+            }
+            courseChangeLog += `Moves ${dist1} MU. `;
+            if (splitTurn2 > 0) {
+                 currentCourse = calculateNewCourse(currentCourse, splitTurn2, direction);
+                 courseChangeLog += `Turns ${splitTurn2}pt to ${direction === 'P' ? 'Port' : 'Starboard'}. `;
+            }
+            courseChangeLog += `Moves ${dist2} MU.`;
+        } else {
+             courseChangeLog += `Moves straight ${newVelocity} MU.`;
+        }
+        
+        ship.course = currentCourse;
+        ship.velocity = newVelocity;
+        courseChangeLog += ` Final course: ${ship.course}. New velocity: ${ship.velocity}.`;
+        
+        ship.order = { turn1: 0, turn2: 0, velocityChange: 0, useET: false, isRolling: false };
+
+        logMessage(`${ship.name}: Order "${orderString}" SUCCESS. ${courseChangeLog}`, 'success');
+    }
+    
+    /**
+     * Calculates new course based on clock-face arithmetic.
+     */
+    function calculateNewCourse(currentCourse, turnAmount, direction) {
+        let newCourse;
+        if (direction === 'P') { // Port / Counter-clockwise
+            newCourse = currentCourse - turnAmount;
+        } else { // Starboard / Clockwise
+            newCourse = currentCourse + turnAmount;
+        }
+        return ((newCourse - 1 + 12*10) % 12) + 1; // Use large multiple of 12 to handle negative results
+    }
+
+    /**
+     * Logs a message to the turn log UI element with appropriate styling.
+     */
+    function logMessage(message, type = 'info') {
+        const p = document.createElement('p');
+        p.textContent = message;
+        switch(type) {
+            case 'system': p.className = 'text-yellow-400 font-semibold'; break;
+            case 'success': p.className = 'text-green-400'; break;
+            case 'warning': p.className = 'text-yellow-500'; break;
+            case 'error': p.className = 'text-red-400 font-semibold'; break;
+            case 'info': default: p.className = 'text-gray-300'; break;
+        }
+        if(turnLog.querySelector('p.text-gray-500')) turnLog.innerHTML = '';
+        turnLog.appendChild(p);
+        turnLog.scrollTop = turnLog.scrollHeight;
+    }
+
+    // --- RENDERING ---
+
+    /**
+     * Clears and re-renders the entire fleet display based on the current state.
+     */
+    function renderFleet() {
+        fleetList.innerHTML = '';
+        if (fleet.length > 0) {
+            fleetPlaceholder.classList.add('hidden');
+            fleet.forEach(ship => {
+                const shipCard = document.createElement('div');
+                shipCard.className = 'ship-card p-4 rounded-lg border flex flex-col gap-3';
+                
+                const { turn1, turn2, velocityChange, useET, isRolling } = ship.order;
+                const shipThrust = ship.currentThrust;
+                const rollCost = isRolling ? 1 : 0;
+                const turnThrustUsed = Math.abs(turn1) + Math.abs(turn2) + rollCost;
+                const totalThrustUsed = turnThrustUsed + Math.abs(velocityChange);
+
+                const maxAllowedThrust = useET ? Math.floor(ship.baseThrust * 1.5) : shipThrust;
+                const maxNormalTurn = ship.hasAdvancedDrive ? shipThrust : Math.floor(shipThrust / 2);
+                const maxTurn = useET ? maxAllowedThrust : maxNormalTurn;
+
+                let orderParts = [];
+                if (turn1 !== 0) orderParts.push(`${turn1 < 0 ? 'P' : 'S'}${Math.abs(turn1)}`);
+                if (turn2 !== 0) orderParts.push(`${turn2 < 0 ? 'P' : 'S'}${Math.abs(turn2)}`);
+                if (velocityChange > 0) orderParts.push(`+${velocityChange}`);
+                else if (velocityChange < 0) orderParts.push(`${velocityChange}`);
+                if (isRolling) orderParts.push('Roll');
+                const orderString = orderParts.length > 0 ? orderParts.join(' ') : 'No Maneuvers';
+
+                let driveStatusDisplay = '';
+                if(ship.driveStatus === 'damaged') {
+                    driveStatusDisplay = `<span class="font-semibold text-yellow-500">(Damaged)</span> <button class="ml-2 text-xs btn-secondary px-2 py-0.5 rounded transition hover:bg-gray-600" onclick="repairDrive(${ship.id})">Repair</button>`;
+                } else if (ship.driveStatus === 'destroyed') {
+                    driveStatusDisplay = `<span class="font-semibold text-red-500">(Destroyed)</span> <button class="ml-2 text-xs btn-secondary px-2 py-0.5 rounded transition hover:bg-gray-600" onclick="repairDrive(${ship.id})">Repair</button>`;
+                }
+
+                shipCard.innerHTML = `
+                    <div class="flex justify-between items-start">
+                        <div>
+                            <h3 class="text-xl font-bold text-white">${ship.name} ${ship.isRolled ? '<span class="text-sm font-normal text-cyan-400">(Rolled)</span>' : ''}</h3>
+                            <p class="text-sm text-gray-400">Base Thrust: ${ship.baseThrust} ${ ship.hasAdvancedDrive ? '<span class="font-semibold text-indigo-400">(Advanced)</span>' : '' } / Current: ${ship.currentThrust} ${driveStatusDisplay}</p>
+                             <p class="text-xs text-gray-400 mt-1">Prior ET Uses: ${ship.priorETUses}</p>
+                        </div>
+                        <button class="btn-danger text-xs font-semibold rounded-md py-1 px-2 transition duration-150 ease-in-out" onclick="removeShip(${ship.id})">Remove</button>
+                    </div>
+                    <div class="grid grid-cols-2 gap-4">
+                        <div class="bg-gray-700/50 p-3 rounded-md text-center">
+                            <p class="text-xs text-gray-400 uppercase font-semibold">Velocity</p>
+                            <p class="text-2xl font-bold text-white">${ship.velocity} <span class="text-lg font-normal">MU</span></p>
+                        </div>
+                        <div class="bg-gray-700/50 p-3 rounded-md text-center">
+                            <p class="text-xs text-gray-400 uppercase font-semibold">Course</p>
+                            <p class="text-2xl font-bold text-white">${ship.course}</p>
+                        </div>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium mb-1">Turn Order</label>
+                        <div class="bg-gray-800/50 p-3 rounded-md space-y-3 border border-gray-600">
+                            <div class="text-center font-mono text-lg h-7 flex items-center justify-center bg-gray-900/50 rounded">
+                                <span>${orderString}</span>
+                            </div>
+                             <div class="grid grid-cols-3 gap-2 text-center items-center">
+                                <button class="btn-order rounded p-2 h-full" onclick="updateOrder(${ship.id}, 'turn', -1, 1)" ${ship.currentThrust === 0 ? 'disabled' : ''}>Port</button>
+                                <span class="text-sm">First Turn: ${turn1}</span>
+                                <button class="btn-order rounded p-2 h-full" onclick="updateOrder(${ship.id}, 'turn', 1, 1)" ${ship.currentThrust === 0 ? 'disabled' : ''}>Starboard</button>
+                            </div>
+                             <div class="grid grid-cols-3 gap-2 text-center items-center">
+                                <button class="btn-order rounded p-2 h-full" onclick="updateOrder(${ship.id}, 'turn', -1, 2)" ${ship.currentThrust === 0 ? 'disabled' : ''}>Port</button>
+                                <span class="text-sm">Second Turn: ${turn2}</span>
+                                <button class="btn-order rounded p-2 h-full" onclick="updateOrder(${ship.id}, 'turn', 1, 2)" ${ship.currentThrust === 0 ? 'disabled' : ''}>Starboard</button>
+                            </div>
+                            <div class="grid grid-cols-3 gap-2 text-center items-center">
+                                <button class="btn-order rounded p-2 h-full" onclick="updateOrder(${ship.id}, 'velocity', -1)" ${ship.currentThrust === 0 ? 'disabled' : ''}>Decel</button>
+                                <span class="text-sm">Vel Change: ${velocityChange}</span>
+                                <button class="btn-order rounded p-2 h-full" onclick="updateOrder(${ship.id}, 'velocity', 1)" ${ship.currentThrust === 0 ? 'disabled' : ''}>Accel</button>
+                            </div>
+                            <div class="w-full bg-gray-900/50 rounded-full h-2.5 mt-2 relative">
+                                <div class="bg-gray-600 h-2.5 rounded-full absolute" style="width: ${(ship.currentThrust / maxAllowedThrust) * 100}%"></div>
+                                <div class="${useET ? 'bg-red-600' : 'bg-indigo-600'} h-2.5 rounded-full" style="width: ${(totalThrustUsed / maxAllowedThrust) * 100}%"></div>
+                            </div>
+                             <div class="flex justify-between items-center text-xs text-gray-400 px-1">
+                                <span>Thrust Used: ${turnThrustUsed}(turn) + ${Math.abs(velocityChange)}(vel) = ${totalThrustUsed} / ${maxAllowedThrust}</span>
+                                <div class="flex items-center gap-4">
+                                     <button class="text-indigo-400 hover:text-indigo-300 font-semibold" onclick="clearOrder(${ship.id})">Reset Order</button>
+                                    <div class="flex items-center">
+                                        <input id="roll-toggle-${ship.id}" type="checkbox" onchange="updateOrder(${ship.id}, 'roll', this.checked)" ${ship.currentThrust === 0 ? 'disabled' : ''} ${isRolling ? 'checked' : ''} class="h-4 w-4 rounded border-gray-400 text-cyan-500 focus:ring-cyan-500">
+                                        <label for="roll-toggle-${ship.id}" class="ml-2 block text-sm font-medium ${ship.currentThrust === 0 ? 'text-gray-600' : 'text-cyan-400'}">Roll</label>
+                                    </div>
+                                    <div class="flex items-center">
+                                        <input id="et-toggle-${ship.id}" type="checkbox" onchange="updateOrder(${ship.id}, 'et', this.checked)" ${ship.driveStatus !== 'ok' ? 'disabled' : ''} ${useET ? 'checked' : ''} class="h-4 w-4 rounded border-gray-400 text-red-600 focus:ring-red-500">
+                                        <label for="et-toggle-${ship.id}" class="ml-2 block text-sm font-medium ${ship.driveStatus !== 'ok' ? 'text-gray-600' : 'text-red-400'}">ET</label>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                `;
+                fleetList.appendChild(shipCard);
+            });
+        } else {
+            fleetPlaceholder.classList.remove('hidden');
+        }
+    }
+
+</script>
+</body>
+</html>
+
